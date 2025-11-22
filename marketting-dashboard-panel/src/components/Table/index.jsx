@@ -1,25 +1,8 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import './styles.css';
-
-const formatMoney = (value) => {
-  if (!value || Number.isNaN(value)) return '-';
-  if (value >= 1_000_000) return `₹${(value / 1_000_000).toFixed(2)} M`;
-  if (value >= 1_000) return `₹${(value / 1_000).toFixed(2)} K`;
-  return `₹${value.toFixed(2)}`;
-};
-
-const formatNumber = (value) => {
-  if (!value || Number.isNaN(value)) return '-';
-  return value.toLocaleString('en-IN');
-};
-
-const formatPercent = (value) => {
-  if (!value || Number.isNaN(value)) return '-';
-  return `${value.toFixed(2)}%`;
-};
-
-const calculateCtr = (clicks, impressions) =>
-  impressions ? (clicks / impressions) * 100 : 0;
+import RegionRow from './RegionRow';
+import ChannelRow from './ChannelRow';
+import { formatMoney, formatNumber, formatPercent, calculateCtr } from './tableUtils';
 
 function ContributionTable({ data = [], totals }) {
   const [openRegions, setOpenRegions] = useState({});
@@ -81,94 +64,18 @@ function ContributionTable({ data = [], totals }) {
     }));
   }, []);
 
-  const renderChannelRow = (channel, regionKey) => {
-    const ctr = calculateCtr(channel.clicks, channel.impressions);
-    const contribution =
-      totalConversions > 0
-        ? (channel.conversions / totalConversions) * 100
-        : 0;
-
-    return (
-      <tr key={`${regionKey}-${channel.channel}`} className="channel-row">
-        <td className="channel-name">
-          <span className="channel-line" />
-          {channel.channel}
-        </td>
-        <td>{formatMoney(channel.spend)}</td>
-        <td>{formatNumber(channel.impressions)}</td>
-        <td>{formatNumber(channel.clicks)}</td>
-        <td>{formatNumber(channel.conversions)}</td>
-        <td>{formatPercent(ctr)}</td>
-        <td>{formatPercent(contribution)}</td>
-      </tr>
-    );
-  };
-
-  const renderRegionRow = (region) => {
-    const isOpen = openRegions[region.region] ?? false;
-    const ctr = calculateCtr(region.totals.clicks, region.totals.impressions);
-    const contribution =
-      totalConversions > 0
-        ? (region.totals.conversions / totalConversions) * 100
-        : 0;
-
-    const handleToggle = () => toggleRegion(region.region);
-
-    const onKeyToggle = (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        handleToggle();
-      }
-    };
-
-    return (
-      <React.Fragment key={region.region}>
-        <tr
-          className={`region-row ${isOpen ? 'is-open' : ''}`}
-          onClick={handleToggle}
-          onKeyDown={onKeyToggle}
-          role="button"
-          tabIndex={0}
-          aria-expanded={isOpen}
-        >
-          <td className="region-name">
-            <button
-              type="button"
-              className="toggle"
-              aria-label={`Toggle ${region.region}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleToggle();
-              }}
-            >
-              <svg
-                className={`chevron-icon ${isOpen ? 'chevron-open' : ''}`}
-                viewBox="0 0 20 20"
-                aria-hidden="true"
-              >
-                <path
-                  d="M6 8l4 4 4-4"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
-            {region.region}
-          </td>
-          <td>{formatMoney(region.totals.spend)}</td>
-          <td>{formatNumber(region.totals.impressions)}</td>
-          <td>{formatNumber(region.totals.clicks)}</td>
-          <td>{formatNumber(region.totals.conversions)}</td>
-          <td>{formatPercent(ctr)}</td>
-          <td>{formatPercent(contribution)}</td>
-        </tr>
-        {isOpen && region.channels.map((channel) => renderChannelRow(channel, region.region))}
-      </React.Fragment>
-    );
-  };
+  const renderChannels = useCallback(
+    (region) =>
+      region.channels.map((channel) => (
+        <ChannelRow
+          key={`${region.region}-${channel.channel}`}
+          channel={channel}
+          regionKey={region.region}
+          totalConversions={totalConversions}
+        />
+      )),
+    [totalConversions]
+  );
 
   const totalCtr = calculateCtr(totals?.clicks, totals?.impressions);
 
@@ -195,7 +102,16 @@ function ContributionTable({ data = [], totals }) {
             </tr>
           </thead>
           <tbody>
-            {regions.map((region) => renderRegionRow(region))}
+            {regions.map((region) => (
+              <RegionRow
+                key={region.region}
+                region={region}
+                isOpen={openRegions[region.region] ?? false}
+                onToggle={toggleRegion}
+                totalConversions={totalConversions}
+                renderChannels={renderChannels}
+              />
+            ))}
           </tbody>
           <tfoot>
             <tr className="total-row">
